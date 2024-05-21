@@ -36,6 +36,7 @@
 #include <float.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include <sys/file.h>
 
 #ifdef WIN32
 #include <windows.h>
@@ -1976,7 +1977,18 @@ plist_err_t plist_write_to_file(plist_t plist, const char* filename, plist_forma
     if (!f) {
         return PLIST_ERR_IO;
     }
+    int fd = fileno(f);
+    if (fd == -1) {
+        fclose(f);
+        return PLIST_ERR_IO;
+    }
+    // 尝试对文件进行排他性锁定
+    if (flock(fd, LOCK_EX | LOCK_NB) == -1) {
+        fclose(f);
+        return PLIST_ERR_IO;
+    }
     plist_err_t err = plist_write_to_stream(plist, f, format, options);
+    flock(fd, LOCK_UN);
     fclose(f);
     return err;
 }
